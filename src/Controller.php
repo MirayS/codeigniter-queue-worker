@@ -112,21 +112,21 @@ class Controller extends CI_Controller
      *
      * @var object
      */
-    protected object $_staticListen;
+    protected $_staticListen;
 
     /**
      * Static worker object for injecting into customized callback process
      *
      * @var object
      */
-    protected object $_staticWork;
+    protected $_staticWork;
 
     /**
      * Static single object for injecting into customized callback process
      *
      * @var object
      */
-    protected object $_staticSingle;
+    protected $_staticSingle;
 
     /**
      * Worker process running stack
