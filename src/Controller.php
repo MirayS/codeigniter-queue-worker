@@ -14,33 +14,35 @@ use CI_Controller;
  */
 class Controller extends CI_Controller
 {
+    protected const WAIT_TIME = 0.2;
+
     /**
      * Debug mode
      *
      * @var boolean
      */
-    public $debug = true;
+    public bool $debug = true;
 
     /**
      * Log file path
      *
      * @var string
      */
-    public $logPath;
+    public string $logPath;
 
     /**
      * PHP CLI command for current environment
      *
      * @var string
      */
-    public $phpCommand = 'php';
+    public string $phpCommand = 'php';
 
     /**
      * Time interval of listen frequency on idle
      *
      * @var integer Seconds
      */
-    public $listenerSleep = 3;
+    public int $listenerSleep = 3;
 
     /**
      * Time interval of worker processes frequency
@@ -49,49 +51,49 @@ class Controller extends CI_Controller
      *
      * @var integer Seconds
      */
-    public $workerSleep = 0;
+    public int $workerSleep = 0;
 
     /**
      * Number of max workers
      *
      * @var integer
      */
-    public $workerMaxNum = 4;
+    public int $workerMaxNum = 4;
 
     /**
      * Number of workers at start, less than or equal to $workerMaxNum
      *
      * @var integer
      */
-    public $workerStartNum = 1;
+    public int $workerStartNum = 1;
 
     /**
      * Waiting time between worker started and next worker starting
      *
      * @var integer Seconds
      */
-    public $workerWaitSeconds = 10;
+    public int $workerWaitSeconds = 10;
 
     /**
      * Enable worker health check for listener
      *
      * @var boolean
      */
-    public $workerHeathCheck = true;
+    public bool $workerHeathCheck = true;
 
     /**
      * Time interval of single processes frequency
      *
      * @var integer Seconds
      */
-    public $singleSleep = 3;
+    public int $singleSleep = 3;
 
     /**
      * Single process unique lock time for unexpected shutdown
      *
      * @var integer Seconds
      */
-    public $singleLockTimeout = 15;
+    public int $singleLockTimeout = 15;
 
     /**
      * Descriptorspec for proc_open()
@@ -99,7 +101,7 @@ class Controller extends CI_Controller
      * @var array
      * @see http://php.net/manual/en/function.proc-open.php
      */
-    protected static $_procDescriptorspec = [
+    protected static array $_procDescriptorspec = [
         ["pipe", "r"],
         ["pipe", "w"],
         ["pipe", "w"],
@@ -110,28 +112,28 @@ class Controller extends CI_Controller
      *
      * @var object
      */
-    protected $_staticListen;
+    protected object $_staticListen;
 
     /**
      * Static worker object for injecting into customized callback process
      *
      * @var object
      */
-    protected $_staticWork;
+    protected object $_staticWork;
 
     /**
      * Static single object for injecting into customized callback process
      *
      * @var object
      */
-    protected $_staticSingle;
+    protected object $_staticSingle;
 
     /**
      * Worker process running stack
      *
      * @var array Worker ID => OS PID
      */
-    protected $_pidStack = [];
+    protected array $_pidStack = [];
     
     function __construct() 
     {
@@ -146,7 +148,19 @@ class Controller extends CI_Controller
         if (method_exists($this, 'init')) {
             // You may need to set config to prevent any continuous growth usage 
             // such as `$this->db->save_queries = false;`
-            return $this->init();
+            $this->init();
+        }
+    }
+
+    /**
+     * Kill all running workers, when destruct
+     */
+    public function __destruct()
+    {
+        foreach ($this->_pidStack as $pid) {
+            if ($this->_isPidAlive($pid)) {
+                posix_kill($pid, 0);
+            }
         }
     }
 
@@ -198,12 +212,11 @@ class Controller extends CI_Controller
         $this->workerWaitSeconds = ($this->workerWaitSeconds >= 1) ? $this->workerWaitSeconds : 10;
 
         while (true) {
-
             // Loading insurance
-            sleep(0.1);
+            sleep(static::WAIT_TIME);
             
             // Call customized listener process, assigns works while catching true by callback return
-        	$hasEvent = ($this->handleListen($this->_staticListen)) ? true : false;
+        	$hasEvent = $this->handleListen($this->_staticListen);
 
             // Start works if exists
             if ($hasEvent) {  
@@ -361,8 +374,6 @@ class Controller extends CI_Controller
         $result = shell_exec($psCmd);
         $psInfo = shell_exec($psInfoCmd);
         echo "Success to launch process `{$action}`: {$route}.\nCalled command: {$launchCmd}\n------\n{$psInfo}";
-
-        return;
     }
 
     /**
@@ -430,7 +441,7 @@ class Controller extends CI_Controller
      * @param object $object
      * @return self
      */
-    protected function setStaticListen($object)
+    protected function setStaticListen($object): Controller
     {
         $this->_staticListen = $object;
         
@@ -446,7 +457,7 @@ class Controller extends CI_Controller
      * @param object $object
      * @return self
      */
-    protected function setStaticWork($object)
+    protected function setStaticWork($object): Controller
     {
         $this->_staticWork = $object;
         
@@ -462,7 +473,7 @@ class Controller extends CI_Controller
      * @param object $object
      * @return self
      */
-    protected function setStaticSingle($object)
+    protected function setStaticSingle($object): Controller
     {
         $this->_staticSingle = $object;
         
@@ -552,11 +563,11 @@ class Controller extends CI_Controller
      * Format output text line
      *
      * @param string $textLine
-     * @return void
+     * @return string
      */
-    protected function _formatTextLine($textLine)
+    protected function _formatTextLine($textLine): string
     {
-        return $textLine = date("Y-m-d H:i:s") . " - {$textLine}" . PHP_EOL;
+        return date("Y-m-d H:i:s") . " - {$textLine}" . PHP_EOL;
     }
 
     /**
@@ -565,9 +576,9 @@ class Controller extends CI_Controller
      * @param integer Process ID
      * @return boolean
      */
-    protected function _isPidAlive($pid)
+    protected function _isPidAlive($pid): bool
     {
-        return ((function_exists('posix_getpgid') && posix_getpgid($pid)) || file_exists("/proc/{$pid}")) ? true : false;
+        return (function_exists('posix_getpgid') && posix_getpgid($pid)) || file_exists("/proc/{$pid}");
     }
 
     /**
@@ -575,10 +586,10 @@ class Controller extends CI_Controller
      *
      * @return boolean
      */
-    protected function _isLinux()
+    protected function _isLinux(): bool
     {
         // Just make sure that it's not Windows
-        return (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') ? false : true;
+        return !((strtoupper(substr(PHP_OS, 0, 3)) === 'WIN'));
     }
 
     /**
